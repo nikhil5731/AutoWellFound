@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Active Tab URL</title>
+  </head>
+  <style>
+    #myButton {
+      background-color: black;
+      width: 100%;
+      border-radius: 50px;
+      border: 0px solid;
+      height: 50px;
+      cursor: pointer;
+      color: white;
+      font-size: larger;
+      background-color: green;
+    }
+    p {
+      font-size: large;
+    }
+    div {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 10rem;
+    }
+  </style>
+  <body>
+    <div>
+      <p id="message" style="display: none; text-align: center">
+        Open Wellfound website job page
+      </p>
+      <p id="jobsFound">132 Jobs found</p>
+      <p id="appliedJobs">50/132 Applied</p>
+      <button id="myButton">Start Applying</button>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
