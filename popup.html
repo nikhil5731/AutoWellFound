@@ -4,6 +4,11 @@
     <title>Active Tab URL</title>
   </head>
   <style>
+    body {
+      margin: 0;
+      padding: 0;
+      color: white;
+    }
     #myButton {
       background-color: black;
       width: 100%;
@@ -18,12 +23,23 @@
     p {
       font-size: large;
     }
+    #scrollToBottom {
+      margin-top: 0px;
+    }
+    #jobsFound {
+      margin-top: 0px;
+    }
+    #appliedJobs {
+      margin-top: 0px;
+    }
     div {
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
+      padding: 30px;
       width: 10rem;
+      background-color: black;
     }
   </style>
   <body>
@@ -31,8 +47,11 @@
       <p id="message" style="display: none; text-align: center">
         Open Wellfound website job page
       </p>
-      <p id="jobsFound">132 Jobs found</p>
-      <p id="appliedJobs">50/132 Applied</p>
+      <p id="jobsFound">No Job found</p>
+      <p id="appliedJobs">Not Applied</p>
+      <p id="scrollToBottom" style="display: none; text-align: center">
+        Scrolling to bottom to fetch all job links
+      </p>
       <button id="myButton">Start Applying</button>
     </div>
     <script src="popup.js"></script>

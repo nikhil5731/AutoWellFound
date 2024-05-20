@@ -3,6 +3,27 @@ document.addEventListener("DOMContentLoaded", function () {
   var message = document.getElementById("message");
   var jobsFound = document.getElementById("jobsFound");
   const jobsAppliedElement = document.getElementById("appliedJobs");
+  var scrollMessage = document.getElementById("scrollToBottom");
+
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === "showScrollMessage") {
+      scrollMessage.style.display = "block";
+      jobsFound.style.display = "none";
+      jobsAppliedElement.style.display = "none";
+    } else if (message.action === "hideScrollMessage") {
+      scrollMessage.style.display = "none";
+      jobsFound.style.display = "block";
+      jobsAppliedElement.style.display = "block";
+    } else if (message.action === "updateAppliedJobs") {
+      chrome.storage.local.get("jobs", function (data) {
+        if (data.jobs) {
+          const jobsApplied = data.jobs.length;
+          jobsAppliedElement.innerText =
+            jobsApplied + "/" + jobsFound.innerText + " Applied";
+        }
+      });
+    }
+  });
 
   function saveRecursionState(state) {
     chrome.storage.local.set({ RecursionState: state }, function () {
@@ -31,19 +52,23 @@ document.addEventListener("DOMContentLoaded", function () {
     function scrollToBottom() {
       chrome.storage.local.get("RecursionState", function (data) {
         if (data.RecursionState) {
+          chrome.runtime.sendMessage({ action: "hideScrollMessage" });
           return;
         }
+
         let tempJobLinks = document.getElementsByClassName(
           "styles_component__uTjje"
         );
+        chrome.runtime.sendMessage({ action: "showScrollMessage" });
+
         if (
           tempJobLinks.length >= numberOfJobs ||
           numberOfScrollsRequired == 0
         ) {
+          chrome.runtime.sendMessage({ action: "hideScrollMessage" });
           startApplication();
           return;
         }
-        console.log({ 1: tempJobLinks.length, 2: numberOfScrollsRequired });
         window.scrollTo({
           top: document.body.scrollHeight,
           behavior: "smooth",
@@ -65,6 +90,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if (data.RecursionState) {
             return;
           }
+
           if (index >= numberOfJobs) {
             // All links processed, exit recursion
             return;
@@ -75,14 +101,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
           // Wait for some time to ensure the modal opens
           setTimeout(() => {
-            // Find and click the apply button within the modal
             fillTextarea(index, 0);
           }, 2000); // Adjust the time delay as needed
         });
       }
 
       function fillTextarea(index, time) {
-        chrome.storage.local.get("RecursionState", function (data) {
+        chrome.storage.local.get(["RecursionState", "jobs"], function (data) {
           if (data.RecursionState) {
             return;
           }
@@ -92,6 +117,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
           if (textarea) {
             // Set the value of the textarea
+            let role = document.getElementsByClassName(
+              "text-center font-[700]"
+            )[0].innerText;
+            let company =
+              document.getElementsByClassName("text-lg font-[500]")[0]
+                .innerText;
+            let jobs = data.jobs || [];
+            let jobExists = jobs.some(
+              (job) => job.company === company && job.role === role
+            );
+
+            if (jobExists) {
+              clickJobLinkAndApply(index + 1);
+              return;
+            }
             if (!textarea.disabled) {
               textarea.defaultValue =
                 "As a Full Stack Developer with FixitAI and a B.Tech student at Delhi Technological University, I'm excited for the opportunities this internship will provide. I am confident in my ability to contribute to your team since I have practical abilities in HTML, CSS, JavaScript, MongoDB, ExpressJS, ReactJS, NodeJS (MERN stack), NextJS, and TypeScript, as well as a track record of delivering successful projects";
@@ -112,6 +152,7 @@ document.addEventListener("DOMContentLoaded", function () {
             // Textarea not found, wait and try again
             if (time >= 10) {
               clickJobLinkAndApply(index + 1);
+              return;
             }
             setTimeout(() => {
               fillTextarea(index, time + 1);
@@ -135,28 +176,31 @@ document.addEventListener("DOMContentLoaded", function () {
           if (applyButton) {
             // Wait for some time to ensure the application is processed
             // applyButton.click();
-            chrome.storage.local.get("appliedJobsNumber", function (data) {
-              let currentNumber = data.appliedJobsNumber || 0; // Default to 0 if no value is found
 
-              // Update the value based on your requirement
-              currentNumber = index + 1; // Adjust this based on your needs
-
-              // Save the updated value back to local storage
-              chrome.storage.local.set(
-                { appliedJobsNumber: currentNumber },
-                function () {
-                  console.log("Applied jobs number updated to", currentNumber);
-                }
-              );
-            });
-
-            chrome.storage.local.get("appliedJobsNumber", function (data) {
-              if (data.appliedJobsNumber) {
-                const jobsApplied = parseInt(data.appliedJobsNumber);
-                jobsAppliedElement.innerText =
-                  jobsApplied + "/" + jobsFound + " Applied";
+            chrome.storage.local.get("jobs", function (data) {
+              let role = document.getElementsByClassName(
+                "text-center font-[700]"
+              )[0].innerText;
+              let company =
+                document.getElementsByClassName("text-lg font-[500]")[0]
+                  .innerText;
+              if (data.jobs) {
+                let jobs = data.jobs;
+                jobs.push({ company: company, role: role });
+                chrome.storage.local.set({ jobs: jobs }, function () {
+                  console.log(jobs);
+                });
+              } else {
+                chrome.storage.local.set(
+                  { jobs: [{ company: company, role: role }] },
+                  function () {
+                    console.log([{ company: company, role: role }]);
+                  }
+                );
               }
             });
+
+            chrome.runtime.sendMessage({ action: "updateAppliedJobs" });
 
             setTimeout(() => {
               clickJobLinkAndApply(index + 1);
@@ -207,15 +251,19 @@ document.addEventListener("DOMContentLoaded", function () {
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
       var activeTab = tabs[0];
       var url = new URL(activeTab.url);
-      if (url.hostname.includes("wellfound.com/jobs")) {
+      if (url.hostname.includes("wellfound.com")) {
         button.style.display = "block";
         message.style.display = "none";
+        jobsAppliedElement.style.display = "block";
+        jobsFound.style.display = "block";
+        loadButtonState();
+        updateJobsFound();
       } else {
         button.style.display = "none";
         message.style.display = "block";
+        jobsAppliedElement.style.display = "none";
+        jobsFound.style.display = "none";
       }
-      loadButtonState();
-      updateJobsFound();
     });
   }
 

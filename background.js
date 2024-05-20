@@ -1,8 +1,12 @@
-// chrome.action.onClicked.addListener((tab) => {
-//   chrome.scripting.executeScript({
-//     target: { tabId: tab.id },
-//     func: () => {
-//     //   alert("Hello Guys!");
-//     },
-//   });
-// });
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (
+    message.action === "showScrollMessage" ||
+    message.action === "hideScrollMessage"
+  ) {
+    chrome.runtime.sendMessage(message);
+  }
+
+  if (message.action === "updateAppliedJobs") {
+    chrome.runtime.sendMessage(message);
+  }
+});
