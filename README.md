@@ -24,5 +24,9 @@ Download this code in your machine and extract the zip file
 5. **Verify Extension is Loaded**
     - After selecting the directory, your extension should appear in the list of installed extensions.
     - If there are any issues with your `manifest.json` or other files, Chrome will display an error message.
+  
+6. **Usage**
+    - Go to `https://wellfound.com/jobs` and Filter the jobs listed to most relevant list.
+    - `Start Applying` 
 
 
