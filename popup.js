@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
-  var button = document.getElementById("myButton");
+  var StartResetButton = document.getElementById("StartReset");
+  var ResumePauseButton = document.getElementById("ResumePause");
   var message = document.getElementById("message");
   var jobsFound = document.getElementById("jobsFound");
   const jobsAppliedElement = document.getElementById("appliedJobs");
@@ -14,14 +15,18 @@ document.addEventListener("DOMContentLoaded", function () {
       scrollMessage.style.display = "none";
       jobsFound.style.display = "block";
       jobsAppliedElement.style.display = "block";
-    } else if (message.action === "updateAppliedJobs") {
+    } else if (message.action === "updateAppliedJobsInExtensionHTML") {
       chrome.storage.local.get("jobs", function (data) {
         if (data.jobs) {
           const jobsApplied = data.jobs.length;
           jobsAppliedElement.innerText =
-            jobsApplied + "/" + jobsFound.innerText + " Applied";
+            jobsApplied + "/" + jobsFound.innerText.split(" ")[0] + " Applied";
         }
       });
+    } else if (message.action === "completedApplying") {
+      jobsAppliedElement.innerText = "Completed!";
+      jobsAppliedElement.style.color = "green";
+      jobsAppliedElement.style.fontWeight = "900";
     }
   });
 
@@ -31,16 +36,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  async function startApplying() {
-    saveRecursionState(false);
-    let [tab] = await chrome.tabs.query({ active: true });
-    chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: startJobApplicationProcess,
-    });
-  }
-
-  async function startJobApplicationProcess() {
+  async function startJobApplicationProcess(startIndex, type) {
     let numberOfJobs = parseInt(
       document
         .getElementsByClassName("styles_header__ilUL3")[0]
@@ -66,7 +62,17 @@ document.addEventListener("DOMContentLoaded", function () {
           numberOfScrollsRequired == 0
         ) {
           chrome.runtime.sendMessage({ action: "hideScrollMessage" });
-          startApplication();
+          if (type === "start") {
+            let jobLinks = document.getElementsByClassName(
+              "styles_jobLink__US40J"
+            );
+            chrome.storage.local.set({ jobLinks: jobLinks });
+            startApplication(jobLinks);
+          } else if (type === "resume") {
+            chrome.storage.local.get("jobLinks", function (data) {
+              startApplication(data.jobLinks);
+            });
+          }
           return;
         }
         window.scrollTo({
@@ -80,24 +86,47 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
 
+    // if (type === "start") {
+    //   let jobLinks = document.getElementsByClassName("styles_jobLink__US40J");
+    //   chrome.runtime.sendMessage(
+    //     { action: "saveJobLinks", jobLinks: jobLinks },
+    //     function (response) {
+    //       if (response.status === "success") {
+    //         startApplication(jobLinks);
+    //       }
+    //     }
+    //   );
+    // } else if (type === "resume") {
+    //   chrome.runtime.sendMessage(
+    //     { action: "getJobLinks" },
+    //     function (response) {
+    //       // console.log("Job Links: ", response.jobLinks);
+    //       startApplication(response.jobLinks);
+    //     }
+    //   );
+    // }
+
     scrollToBottom();
 
-    async function startApplication() {
-      let jobLinks = document.getElementsByClassName("styles_jobLink__US40J");
-
+    async function startApplication(jobLinks) {
       function clickJobLinkAndApply(index) {
         chrome.storage.local.get("RecursionState", function (data) {
+          // console.log(data.RecursionState);
           if (data.RecursionState) {
             return;
           }
 
-          if (index >= numberOfJobs) {
+          if (index >= jobLinks.length) {
             // All links processed, exit recursion
+            chrome.runtime.sendMessage({
+              action: "completedApplying",
+            });
             return;
           }
 
           // Click on the job link
           jobLinks[index].click();
+          chrome.storage.local.set({ currJobIndex: index });
 
           // Wait for some time to ensure the modal opens
           setTimeout(() => {
@@ -116,7 +145,6 @@ document.addEventListener("DOMContentLoaded", function () {
           )[0];
 
           if (textarea) {
-            // Set the value of the textarea
             let role = document.getElementsByClassName(
               "text-center font-[700]"
             )[0].innerText;
@@ -175,7 +203,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
           if (applyButton) {
             // Wait for some time to ensure the application is processed
-            // applyButton.click();
+            applyButton.click();
 
             chrome.storage.local.get("jobs", function (data) {
               let role = document.getElementsByClassName(
@@ -188,19 +216,21 @@ document.addEventListener("DOMContentLoaded", function () {
                 let jobs = data.jobs;
                 jobs.push({ company: company, role: role });
                 chrome.storage.local.set({ jobs: jobs }, function () {
-                  console.log(jobs);
+                  // console.log(jobs);
                 });
               } else {
                 chrome.storage.local.set(
                   { jobs: [{ company: company, role: role }] },
                   function () {
-                    console.log([{ company: company, role: role }]);
+                    // console.log([{ company: company, role: role }]);
                   }
                 );
               }
             });
 
-            chrome.runtime.sendMessage({ action: "updateAppliedJobs" });
+            chrome.runtime.sendMessage({
+              action: "updateAppliedJobsInExtensionHTML",
+            });
 
             setTimeout(() => {
               clickJobLinkAndApply(index + 1);
@@ -220,31 +250,52 @@ document.addEventListener("DOMContentLoaded", function () {
         });
       }
 
-      clickJobLinkAndApply(0);
+      clickJobLinkAndApply(startIndex);
     }
   }
 
-  async function stopApplying() {
-    saveRecursionState(true);
-  }
-
-  function saveButtonState(state) {
-    chrome.storage.local.set({ buttonState: state }, function () {
-      console.log("Button state saved:", state);
+  async function startApplying() {
+    saveRecursionState(false);
+    let startIndex = 0;
+    let type = "start";
+    let [tab] = await chrome.tabs.query({ active: true });
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: startJobApplicationProcess,
+      args: [startIndex, type],
     });
   }
 
-  function loadButtonState() {
-    chrome.storage.local.get("buttonState", function (data) {
-      if (data.buttonState) {
-        button.innerText = data.buttonState;
-        if (data.buttonState === "Stop Applying") {
-          button.style.backgroundColor = "red";
-        } else {
-          button.style.backgroundColor = "green";
+  async function resetApplying() {
+    chrome.storage.local.clear(function () {
+      console.log("Reseted!");
+    });
+    chrome.runtime.sendMessage(
+      { action: "resetJobLinks" },
+      function (response) {
+        if (response.status === "success") {
+          console.log("Reseted Job Links!");
         }
       }
+    );
+    saveRecursionState(true);
+    updateJobsFound();
+  }
+
+  async function resumeApplying() {
+    saveRecursionState(false);
+    chrome.storage.local.get("currJobIndex", async function (data) {
+      let [tab] = await chrome.tabs.query({ active: true });
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: startJobApplicationProcess,
+        args: [data.currJobIndex, "resume"],
+      });
     });
+  }
+
+  async function pauseApplying() {
+    saveRecursionState(true);
   }
 
   function checkUrlAndToggleButton() {
@@ -252,14 +303,14 @@ document.addEventListener("DOMContentLoaded", function () {
       var activeTab = tabs[0];
       var url = new URL(activeTab.url);
       if (url.hostname.includes("wellfound.com")) {
-        button.style.display = "block";
+        StartResetButton.style.display = "block";
         message.style.display = "none";
         jobsAppliedElement.style.display = "block";
         jobsFound.style.display = "block";
         loadButtonState();
         updateJobsFound();
       } else {
-        button.style.display = "none";
+        StartResetButton.style.display = "none";
         message.style.display = "block";
         jobsAppliedElement.style.display = "none";
         jobsFound.style.display = "none";
@@ -282,22 +333,82 @@ document.addEventListener("DOMContentLoaded", function () {
       (results) => {
         if (results && results[0] && results[0].result) {
           jobsFound.innerText = results[0].result + " Jobs Found";
+          chrome.storage.local.get("jobs", function (data) {
+            if (data.jobs) {
+              const jobsApplied = data.jobs.length;
+              jobsAppliedElement.innerText =
+                jobsApplied + "/" + results[0].result + " Applied";
+            }
+          });
         }
       }
     );
   }
 
-  button.addEventListener("click", function () {
-    if (button.innerText === "Start Applying") {
-      button.innerText = "Stop Applying";
-      button.style.backgroundColor = "red";
+  function saveButtonState(state) {
+    chrome.storage.local.set({ buttonState: state }, function () {
+      console.log("Button state saved:", state);
+    });
+  }
+
+  function loadButtonState() {
+    chrome.storage.local.get("buttonState", function (data) {
+      if (data.buttonState) {
+        if (data.buttonState === 1) {
+          StartResetButton.innerText = "Start Applying";
+          StartResetButton.style.backgroundColor = "green";
+          ResumePauseButton.style.display = "none";
+        } else if (data.buttonState === 2) {
+          ResumePauseButton.innerText = "Pause";
+          ResumePauseButton.style.display = "block";
+          ResumePauseButton.style.backgroundColor = "yellow";
+          ResumePauseButton.style.color = "black";
+          StartResetButton.innerText = "Reset";
+          StartResetButton.style.backgroundColor = "red";
+        } else if (data.buttonState === 3) {
+          ResumePauseButton.innerText = "Resume";
+          ResumePauseButton.style.color = "white";
+          ResumePauseButton.style.display = "block";
+          ResumePauseButton.style.backgroundColor = "green";
+          StartResetButton.innerText = "Reset";
+          StartResetButton.style.backgroundColor = "red";
+        }
+      }
+    });
+  }
+
+  StartResetButton.addEventListener("click", function () {
+    if (StartResetButton.innerText === "Start Applying") {
+      StartResetButton.innerText = "Reset";
+      StartResetButton.style.backgroundColor = "red";
+      ResumePauseButton.style.display = "block";
+      ResumePauseButton.innerText = "Pause";
+      ResumePauseButton.style.color = "black";
+      ResumePauseButton.style.backgroundColor = "yellow";
+      saveButtonState(2);
       startApplying();
-      saveButtonState("Stop Applying");
     } else {
-      button.innerText = "Start Applying";
-      button.style.backgroundColor = "green";
-      stopApplying();
-      saveButtonState("Start Applying");
+      StartResetButton.innerText = "Start Applying";
+      StartResetButton.style.backgroundColor = "green";
+      ResumePauseButton.style.display = "none";
+      saveButtonState(1);
+      resetApplying();
+    }
+  });
+
+  ResumePauseButton.addEventListener("click", function () {
+    if (ResumePauseButton.innerText === "Resume") {
+      ResumePauseButton.innerText = "Pause";
+      ResumePauseButton.style.color = "black";
+      ResumePauseButton.style.backgroundColor = "yellow";
+      saveButtonState(2);
+      resumeApplying();
+    } else {
+      ResumePauseButton.innerText = "Resume";
+      ResumePauseButton.style.color = "white";
+      ResumePauseButton.style.backgroundColor = "green";
+      saveButtonState(3);
+      pauseApplying();
     }
   });
 

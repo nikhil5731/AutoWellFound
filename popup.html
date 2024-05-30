@@ -9,7 +9,8 @@
       padding: 0;
       color: white;
     }
-    #myButton {
+    button {
+      margin-bottom: 10px;
       background-color: black;
       width: 100%;
       border-radius: 50px;
@@ -23,6 +24,9 @@
     p {
       font-size: large;
     }
+    #ResumePause {
+      display: none;
+    }
     #scrollToBottom {
       margin-top: 0px;
     }
@@ -31,6 +35,7 @@
     }
     #appliedJobs {
       margin-top: 0px;
+      text-align: center;
     }
     div {
       display: flex;
@@ -52,7 +57,8 @@
       <p id="scrollToBottom" style="display: none; text-align: center">
         Scrolling to bottom to fetch all job links
       </p>
-      <button id="myButton">Start Applying</button>
+      <button id="ResumePause">Resume</button>
+      <button id="StartReset">Start Applying</button>
     </div>
     <script src="popup.js"></script>
   </body>
